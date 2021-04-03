@@ -2,9 +2,7 @@ use std::env;
 use std::path::PathBuf;
 
 fn main() {
-    let witx_paths = match env::args_os().nth(1) {
-        Some(path) => vec![PathBuf::from(path)],
-        None => witx::phases::snapshot().unwrap(),
-    };
+    let witx_paths = env::args_os().skip(1).map(|arg| PathBuf::from(arg)).collect::<Vec<_>>();
+
     print!("{}", witx_bindgen::generate(&witx_paths));
 }
