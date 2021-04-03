@@ -1203,6 +1203,46 @@ pub struct Prestat {
     pub u: PrestatU,
 }
 
+pub type TransportEndpoint = Fd;
+pub type TransportEndpointPool = Fd;
+pub type TransportConnection = Fd;
+#[repr(transparent)]
+#[derive(Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
+pub struct TransportConnectionEndpointType(u8);
+pub const TRANSPORT_CONNECTION_ENDPOINT_TYPE_INITIATOR: TransportConnectionEndpointType =
+    TransportConnectionEndpointType(0);
+pub const TRANSPORT_CONNECTION_ENDPOINT_TYPE_TARGET: TransportConnectionEndpointType =
+    TransportConnectionEndpointType(1);
+impl TransportConnectionEndpointType {
+    pub const fn raw(&self) -> u8 {
+        self.0
+    }
+
+    pub fn name(&self) -> &'static str {
+        match self.0 {
+            0 => "INITIATOR",
+            1 => "TARGET",
+            _ => unsafe { core::hint::unreachable_unchecked() },
+        }
+    }
+    pub fn message(&self) -> &'static str {
+        match self.0 {
+            0 => "",
+            1 => "",
+            _ => unsafe { core::hint::unreachable_unchecked() },
+        }
+    }
+}
+impl fmt::Debug for TransportConnectionEndpointType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TransportConnectionEndpointType")
+            .field("code", &self.0)
+            .field("name", &self.name())
+            .field("message", &self.message())
+            .finish()
+    }
+}
+
 /// Read command-line argument data.
 /// The size of the array should match that returned by `args_sizes_get`
 pub unsafe fn args_get(argv: *mut *mut u8, argv_buf: *mut u8) -> Result<(), Errno> {
@@ -2138,6 +2178,175 @@ pub unsafe fn sock_shutdown(fd: Fd, how: Sdflags) -> Result<(), Errno> {
     }
 }
 
+pub unsafe fn transport_endpoint_open(
+    local_endpoint_pool: TransportEndpointPool,
+    specifier: &str,
+) -> Result<TransportEndpoint, Errno> {
+    let mut rp0 = MaybeUninit::<TransportEndpoint>::uninit();
+    let ret = wasi_snapshot_preview1::transport_endpoint_open(
+        local_endpoint_pool as i32,
+        specifier.as_ptr() as i32,
+        specifier.len() as i32,
+        rp0.as_mut_ptr() as i32,
+    );
+    match ret {
+        0 => Ok(core::ptr::read(
+            rp0.as_mut_ptr() as i32 as *const TransportEndpoint
+        )),
+        _ => Err(Errno(ret as u16)),
+    }
+}
+
+pub unsafe fn transport_listen(local_endpoint: TransportEndpoint) -> Result<(), Errno> {
+    let ret = wasi_snapshot_preview1::transport_listen(local_endpoint as i32);
+    match ret {
+        0 => Ok(()),
+        _ => Err(Errno(ret as u16)),
+    }
+}
+
+pub unsafe fn transport_accept(
+    local_endpoint: TransportEndpoint,
+    remote_endpoint_pool: TransportEndpointPool,
+) -> Result<TransportConnection, Errno> {
+    let mut rp0 = MaybeUninit::<TransportConnection>::uninit();
+    let ret = wasi_snapshot_preview1::transport_accept(
+        local_endpoint as i32,
+        remote_endpoint_pool as i32,
+        rp0.as_mut_ptr() as i32,
+    );
+    match ret {
+        0 => Ok(core::ptr::read(
+            rp0.as_mut_ptr() as i32 as *const TransportConnection
+        )),
+        _ => Err(Errno(ret as u16)),
+    }
+}
+
+pub unsafe fn transport_connect(
+    local_endpoint: TransportEndpoint,
+    remote_endpoint: TransportEndpoint,
+) -> Result<TransportConnection, Errno> {
+    let mut rp0 = MaybeUninit::<TransportConnection>::uninit();
+    let ret = wasi_snapshot_preview1::transport_connect(
+        local_endpoint as i32,
+        remote_endpoint as i32,
+        rp0.as_mut_ptr() as i32,
+    );
+    match ret {
+        0 => Ok(core::ptr::read(
+            rp0.as_mut_ptr() as i32 as *const TransportConnection
+        )),
+        _ => Err(Errno(ret as u16)),
+    }
+}
+
+pub unsafe fn transport_send(
+    connection: TransportConnection,
+    data: CiovecArray<'_>,
+) -> Result<Size, Errno> {
+    let mut rp0 = MaybeUninit::<Size>::uninit();
+    let ret = wasi_snapshot_preview1::transport_send(
+        connection as i32,
+        data.as_ptr() as i32,
+        data.len() as i32,
+        rp0.as_mut_ptr() as i32,
+    );
+    match ret {
+        0 => Ok(core::ptr::read(rp0.as_mut_ptr() as i32 as *const Size)),
+        _ => Err(Errno(ret as u16)),
+    }
+}
+
+pub unsafe fn transport_recv(
+    connection: TransportConnection,
+    data: CiovecArray<'_>,
+) -> Result<Size, Errno> {
+    let mut rp0 = MaybeUninit::<Size>::uninit();
+    let ret = wasi_snapshot_preview1::transport_recv(
+        connection as i32,
+        data.as_ptr() as i32,
+        data.len() as i32,
+        rp0.as_mut_ptr() as i32,
+    );
+    match ret {
+        0 => Ok(core::ptr::read(rp0.as_mut_ptr() as i32 as *const Size)),
+        _ => Err(Errno(ret as u16)),
+    }
+}
+
+pub unsafe fn transport_send_to(
+    local_endpoint: TransportEndpoint,
+    remote_endpoint: TransportEndpoint,
+    data: CiovecArray<'_>,
+) -> Result<Size, Errno> {
+    let mut rp0 = MaybeUninit::<Size>::uninit();
+    let ret = wasi_snapshot_preview1::transport_send_to(
+        local_endpoint as i32,
+        remote_endpoint as i32,
+        data.as_ptr() as i32,
+        data.len() as i32,
+        rp0.as_mut_ptr() as i32,
+    );
+    match ret {
+        0 => Ok(core::ptr::read(rp0.as_mut_ptr() as i32 as *const Size)),
+        _ => Err(Errno(ret as u16)),
+    }
+}
+
+pub unsafe fn transport_recv_from(
+    local_endpoint: TransportEndpoint,
+    remote_endpoint_pool: TransportEndpointPool,
+    data: CiovecArray<'_>,
+) -> Result<Size, Errno> {
+    let mut rp0 = MaybeUninit::<Size>::uninit();
+    let ret = wasi_snapshot_preview1::transport_recv_from(
+        local_endpoint as i32,
+        remote_endpoint_pool as i32,
+        data.as_ptr() as i32,
+        data.len() as i32,
+        rp0.as_mut_ptr() as i32,
+    );
+    match ret {
+        0 => Ok(core::ptr::read(rp0.as_mut_ptr() as i32 as *const Size)),
+        _ => Err(Errno(ret as u16)),
+    }
+}
+
+pub unsafe fn transport_connection_endpoint(
+    connection: TransportConnection,
+    type_: TransportConnectionEndpointType,
+) -> Result<TransportEndpoint, Errno> {
+    let mut rp0 = MaybeUninit::<TransportEndpoint>::uninit();
+    let ret = wasi_snapshot_preview1::transport_connection_endpoint(
+        connection as i32,
+        type_.0 as i32,
+        rp0.as_mut_ptr() as i32,
+    );
+    match ret {
+        0 => Ok(core::ptr::read(
+            rp0.as_mut_ptr() as i32 as *const TransportEndpoint
+        )),
+        _ => Err(Errno(ret as u16)),
+    }
+}
+
+pub unsafe fn transport_endpoint_get_specifier(
+    endpoint: TransportEndpoint,
+    specifier: Ciovec,
+) -> Result<Size, Errno> {
+    let mut rp0 = MaybeUninit::<Size>::uninit();
+    let ret = wasi_snapshot_preview1::transport_endpoint_get_specifier(
+        endpoint as i32,
+        &specifier as *const _ as i32,
+        rp0.as_mut_ptr() as i32,
+    );
+    match ret {
+        0 => Ok(core::ptr::read(rp0.as_mut_ptr() as i32 as *const Size)),
+        _ => Err(Errno(ret as u16)),
+    }
+}
+
 pub mod wasi_snapshot_preview1 {
     #[link(wasm_import_module = "wasi_snapshot_preview1")]
     extern "C" {
@@ -2333,5 +2542,15 @@ pub mod wasi_snapshot_preview1 {
         /// Shut down socket send and receive channels.
         /// Note: This is similar to `shutdown` in POSIX.
         pub fn sock_shutdown(arg0: i32, arg1: i32) -> i32;
+        pub fn transport_endpoint_open(arg0: i32, arg1: i32, arg2: i32, arg3: i32) -> i32;
+        pub fn transport_listen(arg0: i32) -> i32;
+        pub fn transport_accept(arg0: i32, arg1: i32, arg2: i32) -> i32;
+        pub fn transport_connect(arg0: i32, arg1: i32, arg2: i32) -> i32;
+        pub fn transport_send(arg0: i32, arg1: i32, arg2: i32, arg3: i32) -> i32;
+        pub fn transport_recv(arg0: i32, arg1: i32, arg2: i32, arg3: i32) -> i32;
+        pub fn transport_send_to(arg0: i32, arg1: i32, arg2: i32, arg3: i32, arg4: i32) -> i32;
+        pub fn transport_recv_from(arg0: i32, arg1: i32, arg2: i32, arg3: i32, arg4: i32) -> i32;
+        pub fn transport_connection_endpoint(arg0: i32, arg1: i32, arg2: i32) -> i32;
+        pub fn transport_endpoint_get_specifier(arg0: i32, arg1: i32, arg2: i32) -> i32;
     }
 }
